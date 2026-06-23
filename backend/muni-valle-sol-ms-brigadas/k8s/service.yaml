@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-brigadas
+  namespace: muni-valle-sol
+  labels:
+    app: ms-brigadas
+spec:
+  selector:
+    app: ms-brigadas
+  ports:
+    - name: http
+      port: 8084
+      targetPort: http
+  type: ClusterIP

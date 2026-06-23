@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-reportes
+  namespace: muni-valle-sol
+spec:
+  selector:
+    app: ms-reportes
+  ports:
+    - port: 8082
+      targetPort: 8082

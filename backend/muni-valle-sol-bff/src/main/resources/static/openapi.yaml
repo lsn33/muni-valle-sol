@@ -1,0 +1,9 @@
+openapi: 3.0.3
+info:
+  title: Muni Valle Sol BFF API
+  version: 1.0.0
+  description: Static copy of the generated OpenAPI spec
+servers:
+  - url: http://localhost:8080
+
+# (copy of dynamic spec)

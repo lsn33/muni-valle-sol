@@ -1,0 +1,7 @@
+target/
+.git/
+*.md
+node_modules/
+package.json
+package-lock.json
+.mvn/wrapper/maven-wrapper.jar

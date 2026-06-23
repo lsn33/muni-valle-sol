@@ -1,0 +1,107 @@
+services:
+
+  ms-usuarios:
+    build:
+      context: ../muni-valle-sol-ms-usuarios
+      dockerfile: Dockerfile
+    container_name: ms-usuarios
+    ports:
+      - "8081:8081"
+    environment:
+      DB_URL: jdbc:postgresql://ep-orange-bar-an1823ou-pooler.c-6.us-east-1.aws.neon.tech/ms-usuarios?sslmode=require&channelBinding=require
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_PRIVATE_KEY_PATH: /app/keys/private_key.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/public_key.pem
+    volumes:
+      - ../muni-valle-sol-ms-usuarios/private_key.pem:/app/keys/private_key.pem:ro
+      - ../muni-valle-sol-ms-usuarios/public_key.pem:/app/keys/public_key.pem:ro
+    networks:
+      - muni-network
+    restart: unless-stopped
+
+  ms-reportes:
+    build:
+      context: ../muni-valle-sol-ms-reportes
+      dockerfile: Dockerfile
+    container_name: ms-reportes
+    ports:
+      - "8082:8082"
+    environment:
+      DB_URL: jdbc:postgresql://ep-orange-bar-an1823ou-pooler.c-6.us-east-1.aws.neon.tech/ms-reportes?sslmode=require&channelBinding=require
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    networks:
+      - muni-network
+    restart: unless-stopped
+
+  ms-brigadas:
+    build:
+      context: ../muni-valle-sol-ms-brigadas
+      dockerfile: Dockerfile
+    container_name: ms-brigadas
+    ports:
+      - "8084:8084"
+    environment:
+      DB_URL: jdbc:postgresql://ep-orange-bar-an1823ou-pooler.c-6.us-east-1.aws.neon.tech/ms-brigadas?sslmode=require&channelBinding=require
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    networks:
+      - muni-network
+    restart: unless-stopped
+
+  ms-alertas:
+    build:
+      context: ../muni-valle-sol-ms-alertas
+      dockerfile: Dockerfile
+    container_name: ms-alertas
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATA_MONGODB_URI: ${MONGO_URI}
+    networks:
+      - muni-network
+    restart: unless-stopped
+
+  bff:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bff
+    ports:
+      - "8080:8080"
+    environment:
+      MS_USUARIOS_URL: http://ms-usuarios:8081
+      MS_REPORTES_URL: http://ms-reportes:8082
+      MS_BRIGADAS_URL: http://ms-brigadas:8084
+      MS_ALERTAS_URL: http://ms-alertas:8083/api/v1
+      JWT_COOKIE_SECURE: "false"
+    depends_on:
+      - ms-usuarios
+      - ms-reportes
+      - ms-brigadas
+      - ms-alertas
+    networks:
+      - muni-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../muni-valle-sol-frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BFF_URL: http://localhost:8080
+    container_name: frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_BFF_URL: http://localhost:8080
+    depends_on:
+      - bff
+    networks:
+      - muni-network
+    restart: unless-stopped
+
+networks:
+  muni-network:
+    driver: bridge

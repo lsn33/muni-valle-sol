@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: muni-bff
+  namespace: muni-valle-sol
+  labels:
+    app: muni-bff
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: muni-bff
+  template:
+    metadata:
+      labels:
+        app: muni-bff
+    spec:
+      containers:
+        - name: muni-bff
+          image: JOAKOO123/muni-valle-sol-bff:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: MS_USUARIOS_URL
+              value: "http://ms-usuarios:8081"
+            - name: MS_REPORTES_URL
+              value: "http://ms-reportes:8082"
+            - name: MS_ALERTAS_URL
+              value: "http://ms-alertas:8083/api/v1"
+            - name: MS_BRIGADAS_URL
+              value: "http://ms-brigadas:8084"
+            - name: CORS_ORIGINS
+              value: "http://muni-frontend"
+            - name: JWT_COOKIE_SECURE
+              value: "false"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "150m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 25
+            periodSeconds: 10

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: muni-bff
+  namespace: muni-valle-sol
+  labels:
+    app: muni-bff
+spec:
+  selector:
+    app: muni-bff
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP

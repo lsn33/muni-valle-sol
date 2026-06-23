@@ -1,0 +1,893 @@
+openapi: 3.0.3
+info:
+  title: Municipalidad Valle del Sol - BFF API
+  description: |
+    Backend For Frontend (BFF) para la plataforma de gestión de incendios
+    de la Municipalidad Valle del Sol.
+    
+    <p>Características principales:</p>
+    <ul>
+      <li>Autenticación JWT mediante cookies HttpOnly</li>
+      <li>Gestión de reportes de incendios en tiempo real</li>
+      <li>Sistema de alertas automáticas según severidad</li>
+      <li>Integración con microservicios especializados</li>
+      <li>Resilencia mediante Circuit Breaker (Resilience4j)</li>
+    </ul>
+  version: 1.0.0
+  contact:
+    name: Equipo de Desarrollo
+    email: desarrollo@munivallesol.cl
+    url: https://munivallesol.cl
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+  x-logo:
+    url: https://munivallesol.cl/logo.png
+    altText: Municipalidad Valle del Sol
+
+servers:
+  - url: http://localhost:8080
+    description: Servidor Local
+    variables:
+      basePath:
+        default: /api
+  - url: https://bff-dev.munivallesol.cl
+    description: Ambiente Desarrollo
+    variables:
+      basePath:
+        default: /api
+  - url: https://bff-prod.munivallesol.cl
+    description: Ambiente Producción
+    variables:
+      basePath:
+        default: /api
+
+tags:
+  - name: Autenticación
+    description: Endpoints de login, registro y verificación de sesión
+  - name: Reportes
+    description: Gestión completa de reportes de incendios
+  - name: Alertas
+    description: Sistema de alertas derivadas de reportes activos
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+      description: |
+        Token JWT almacenado en cookie HttpOnly.
+        Se establece automáticamente tras login.
+
+  schemas:
+    # ──── DTOs de Autenticación ────
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: juan@example.com
+          description: Email del usuario
+        password:
+          type: string
+          format: password
+          example: SecurePass123!
+          description: Contraseña del usuario
+      description: Solicitud de autenticación con credenciales
+
+    LoginResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+          description: Identificador único del usuario
+        nombre:
+          type: string
+          example: Juan García
+          description: Nombre completo del usuario
+        email:
+          type: string
+          format: email
+          example: juan@example.com
+          description: Email del usuario autenticado
+        rol:
+          type: string
+          enum: [ADMIN, USER, VIEWER]
+          example: ADMIN
+          description: Rol asignado al usuario
+      description: Respuesta con datos del usuario autenticado
+
+    RegisterRequest:
+      type: object
+      required:
+        - nombre
+        - email
+        - password
+        - rol
+      properties:
+        nombre:
+          type: string
+          example: Juan García
+          description: Nombre completo del nuevo usuario
+        email:
+          type: string
+          format: email
+          example: juan@example.com
+          description: Email del nuevo usuario
+        password:
+          type: string
+          format: password
+          example: SecurePass123!
+          description: Contraseña del nuevo usuario
+        rol:
+          type: string
+          enum: [USER, VIEWER]
+          example: USER
+          description: Rol a asignar (ADMIN solo por administrador)
+      description: Solicitud de registro de nuevo usuario
+
+    UserData:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        nombre:
+          type: string
+          example: Juan García
+        email:
+          type: string
+          format: email
+          example: juan@example.com
+        rol:
+          type: string
+          enum: [ADMIN, USER, VIEWER]
+          example: ADMIN
+        activo:
+          type: boolean
+          example: true
+      description: Datos públicos de un usuario
+
+    # ──── DTOs de Reportes ────
+    Location:
+      type: object
+      properties:
+        lat:
+          type: number
+          format: double
+          example: -33.8688
+          description: Latitud geográfica
+        lng:
+          type: number
+          format: double
+          example: -71.5203
+          description: Longitud geográfica
+      description: Coordenadas geográficas del incidente
+
+    ReportDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 101
+          description: Identificador único del reporte
+        titulo:
+          type: string
+          example: Incendio en Cerro Norte
+          description: Título descriptivo del reporte
+        descripcion:
+          type: string
+          example: Fuego activo en ladera norte, cerca de viviendas
+          description: Descripción detallada del incidente
+        tipo:
+          type: string
+          enum: [INCENDIO, HUMO, SOSPECHOSO]
+          example: INCENDIO
+          description: Clasificación del incidente
+        estado:
+          type: string
+          enum: [ACTIVO, RESUELTO, CERRADO]
+          example: ACTIVO
+          description: Estado actual del reporte
+        emailUsuario:
+          type: string
+          format: email
+          example: juan@example.com
+          description: Email del usuario que reportó
+        ubicacion:
+          $ref: '#/components/schemas/Location'
+        fechaCreacion:
+          type: string
+          format: date-time
+          example: 2026-06-13T14:30:00
+          description: Fecha y hora de creación del reporte
+      description: Reporte de incendio con ubicación anidada
+
+    CreateReportRequest:
+      type: object
+      required:
+        - titulo
+        - descripcion
+        - tipo
+        - emailUsuario
+        - latitud
+        - longitud
+      properties:
+        titulo:
+          type: string
+          example: Incendio en Cerro Norte
+          description: Título descriptivo
+        descripcion:
+          type: string
+          example: Fuego activo en ladera norte
+          description: Descripción del incidente
+        tipo:
+          type: string
+          enum: [INCENDIO, HUMO, SOSPECHOSO]
+          example: INCENDIO
+          description: Tipo de incidente
+        emailUsuario:
+          type: string
+          format: email
+          example: juan@example.com
+          description: Email del usuario que reporta
+        latitud:
+          type: number
+          format: double
+          example: -33.8688
+          description: Coordenada de latitud
+        longitud:
+          type: number
+          format: double
+          example: -71.5203
+          description: Coordenada de longitud
+      description: Solicitud para crear un nuevo reporte
+
+    UpdateStatusRequest:
+      type: object
+      required:
+        - estado
+      properties:
+        estado:
+          type: string
+          enum: [ACTIVO, RESUELTO, CERRADO]
+          example: RESUELTO
+          description: Nuevo estado del reporte
+      description: Solicitud para actualizar estado de reporte
+
+    UpdateTitleRequest:
+      type: object
+      required:
+        - titulo
+      properties:
+        titulo:
+          type: string
+          example: Incendio Zona Crítica - ACTUALIZADO
+          description: Nuevo título del reporte
+      description: Solicitud para actualizar título de reporte
+
+    # ──── DTOs de Alertas ────
+    AlertDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+          description: Identificador único de la alerta
+        titulo:
+          type: string
+          example: Alerta Incendio Forestal
+          description: Título de la alerta
+        descripcion:
+          type: string
+          example: Incendio activo detectado en cerro norte
+          description: Descripción de la alerta
+        severidad:
+          type: string
+          enum: [BAJA, MEDIA, ALTA, CRITICA]
+          example: ALTA
+          description: Nivel de severidad
+        fecha:
+          type: string
+          format: date-time
+          example: 2026-06-13T14:30:00
+          description: Fecha y hora de creación
+      description: Alerta activa del sistema
+
+    CreateAlertRequest:
+      type: object
+      required:
+        - titulo
+        - descripcion
+        - severidad
+      properties:
+        titulo:
+          type: string
+          example: Alerta Manual
+          description: Título de la alerta
+        descripcion:
+          type: string
+          example: Situación crítica detectada manualmente
+          description: Descripción detallada
+        severidad:
+          type: string
+          enum: [BAJA, MEDIA, ALTA]
+          example: ALTA
+          description: Nivel de severidad
+      description: Solicitud para crear alerta manual
+
+    # ──── Respuestas de Error ────
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: El campo 'titulo' es obligatorio
+          description: Mensaje de error
+        timestamp:
+          type: string
+          format: date-time
+          example: 2026-06-13T14:35:00
+          description: Fecha y hora del error
+        status:
+          type: integer
+          example: 400
+          description: Código de estado HTTP
+      description: Respuesta estándar de error
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: El campo 'severidad' debe ser ALTA, MEDIA o BAJA
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 400
+      description: Error de validación en request
+
+paths:
+  # ══════════════════════════════════════════════════════════════════════════════
+  # AUTENTICACIÓN
+  # ══════════════════════════════════════════════════════════════════════════════
+
+  /auth/login:
+    post:
+      tags:
+        - Autenticación
+      summary: Autentica un usuario
+      description: |
+        Realiza login con email y password.
+        
+        **Flujo:**
+        1. Se validan las credenciales contra MS-Usuarios
+        2. Se genera un token JWT
+        3. Se establece cookie HttpOnly con el token (seguro, no accesible desde JS)
+        4. Se retorna datos del usuario autenticado
+        
+        **Nota:** La cookie se establece automáticamente en la respuesta.
+        Todos los requests posteriores la envían automáticamente.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              admin:
+                summary: Login de admin
+                value:
+                  email: admin@munivallesol.cl
+                  password: AdminPass123!
+              user:
+                summary: Login de usuario regular
+                value:
+                  email: juan@example.com
+                  password: SecurePass123!
+      responses:
+        '200':
+          description: Autenticación exitosa
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; HttpOnly; Secure; SameSite=Strict; Path=/
+              description: Cookie HttpOnly con token JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                id: 1
+                nombre: Admin Usuario
+                email: admin@munivallesol.cl
+                rol: ADMIN
+        '401':
+          description: Credenciales incorrectas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Credenciales incorrectas
+                status: 401
+                timestamp: 2026-06-13T14:35:00
+        '503':
+          description: Servicio de usuarios no disponible (Circuit Breaker abierto)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/register:
+    post:
+      tags:
+        - Autenticación
+      summary: Registra un nuevo usuario
+      description: |
+        Crea una nueva cuenta de usuario en el sistema.
+        
+        **Restricciones:**
+        - El email debe ser único
+        - La contraseña debe cumplir requisitos de complejidad
+        - Solo se pueden asignar roles USER o VIEWER (ADMIN requiere autorización especial)
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              nombre: Nuevo Usuario
+              email: nuevo@example.com
+              password: SecurePass123!
+              rol: USER
+      responses:
+        '201':
+          description: Usuario creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserData'
+        '400':
+          description: Datos de registro inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '409':
+          description: El email ya está registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Servicio de usuarios no disponible
+
+  /auth/logout:
+    post:
+      tags:
+        - Autenticación
+      summary: Cierra la sesión del usuario
+      description: |
+        Elimina la cookie HttpOnly invalidando la sesión.
+        
+        **Comportamiento:**
+        - La cookie se elimina del navegador
+        - Los requests posteriores sin cookie fallarán con 401
+      operationId: logout
+      responses:
+        '204':
+          description: Sesión cerrada exitosamente
+        '401':
+          description: No hay sesión activa
+
+  /auth/me:
+    get:
+      tags:
+        - Autenticación
+      summary: Obtiene datos del usuario actual
+      description: |
+        Retorna los datos del usuario autenticado.
+        
+        **Seguridad:** Requiere cookie válida con token JWT.
+        Si el token es inválido o ha expirado, retorna 401.
+      operationId: getCurrentUser
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Datos del usuario actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserData'
+              example:
+                id: 1
+                nombre: Admin Usuario
+                email: admin@munivallesol.cl
+                rol: ADMIN
+                activo: true
+        '401':
+          description: Token inválido o expirado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # REPORTES
+  # ══════════════════════════════════════════════════════════════════════════════
+
+  /reportes:
+    get:
+      tags:
+        - Reportes
+      summary: Lista todos los reportes
+      description: |
+        Obtiene la lista completa de reportes sin filtros.
+        Incluye reportes en todos los estados (ACTIVO, RESUELTO, CERRADO).
+        
+        **Circuit Breaker:** Si MS-Reportes no responde, retorna lista vacía.
+      operationId: listAllReports
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Lista de reportes obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReportDTO'
+        '401':
+          description: Usuario no autenticado
+
+    post:
+      tags:
+        - Reportes
+      summary: Crea un nuevo reporte de incendio
+      description: |
+        Registra un nuevo incendio en el sistema.
+        
+        **Flujo:**
+        1. Se validan todos los campos obligatorios
+        2. Se transforma el record a Map en ReportRequestHandler
+        3. Se envía a MS-Reportes para persistencia
+        4. Se mapea la respuesta a ReportDTO
+        
+        **Tipos de incidente:**
+        - INCENDIO: Fuego activo (severidad → ALTA)
+        - HUMO: Presencia de humo (severidad → MEDIA)
+        - SOSPECHOSO: Actividad sospechosa (severidad → BAJA)
+      operationId: createReport
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportRequest'
+            example:
+              titulo: Incendio en Cerro Norte
+              descripcion: Fuego activo en ladera norte, cerca de viviendas
+              tipo: INCENDIO
+              emailUsuario: juan@example.com
+              latitud: -33.8688
+              longitud: -71.5203
+      responses:
+        '201':
+          description: Reporte creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDTO'
+        '400':
+          description: Datos inválidos
+        '401':
+          description: Usuario no autenticado
+        '503':
+          description: MS-Reportes no disponible
+
+  /reportes/activos:
+    get:
+      tags:
+        - Reportes
+      summary: Lista reportes activos
+      description: |
+        Obtiene solo los reportes con estado ACTIVO.
+        Útil para dashboard en tiempo real y alertas.
+      operationId: listActiveReports
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Lista de reportes activos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReportDTO'
+        '401':
+          description: Usuario no autenticado
+
+  /reportes/{id}:
+    get:
+      tags:
+        - Reportes
+      summary: Obtiene un reporte por ID
+      description: Recupera los detalles completos de un reporte específico.
+      operationId: getReportById
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          example: 101
+          description: Identificador del reporte
+      responses:
+        '200':
+          description: Reporte encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDTO'
+        '401':
+          description: Usuario no autenticado
+        '404':
+          description: Reporte no encontrado
+        '503':
+          description: MS-Reportes no disponible
+
+    put:
+      tags:
+        - Reportes
+      summary: Actualiza el título de un reporte
+      description: Modifica el título descriptivo de un reporte existente.
+      operationId: updateReportTitle
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          example: 101
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTitleRequest'
+            example:
+              titulo: Incendio Zona Crítica - ACTUALIZADO
+      responses:
+        '200':
+          description: Reporte actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDTO'
+        '401':
+          description: Usuario no autenticado
+        '404':
+          description: Reporte no encontrado
+        '503':
+          description: MS-Reportes no disponible
+
+    delete:
+      tags:
+        - Reportes
+      summary: Elimina un reporte
+      description: Borra permanentemente un reporte del sistema.
+      operationId: deleteReport
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          example: 101
+      responses:
+        '204':
+          description: Reporte eliminado exitosamente
+        '401':
+          description: Usuario no autenticado
+        '404':
+          description: Reporte no encontrado
+        '503':
+          description: MS-Reportes no disponible
+
+  /reportes/{id}/estado:
+    put:
+      tags:
+        - Reportes
+      summary: Actualiza el estado de un reporte
+      description: |
+        Cambia el estado de un reporte.
+        
+        **Estados disponibles:**
+        - ACTIVO: Incidente en curso
+        - RESUELTO: Incidente controlado/extinguido
+        - CERRADO: Incidente completamente resuelto
+      operationId: updateReportStatus
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          example: 101
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStatusRequest'
+            examples:
+              resolved:
+                summary: Marcar como resuelto
+                value:
+                  estado: RESUELTO
+              closed:
+                summary: Cerrar completamente
+                value:
+                  estado: CERRADO
+      responses:
+        '200':
+          description: Estado actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDTO'
+        '401':
+          description: Usuario no autenticado
+        '404':
+          description: Reporte no encontrado
+        '503':
+          description: MS-Reportes no disponible
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # ALERTAS
+  # ══════════════════════════════════════════════════════════════════════════════
+
+  /alertas:
+    get:
+      tags:
+        - Alertas
+      summary: Lista todas las alertas activas
+      description: |
+        Obtiene alertas generadas automáticamente desde reportes ACTIVO.
+        
+        **Generación automática:**
+        - INCENDIO → severidad ALTA
+        - HUMO → severidad MEDIA
+        - SOSPECHOSO → severidad BAJA
+        
+        Útil para dashboards de monitoreo en tiempo real.
+      operationId: listAlerts
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Lista de alertas activas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AlertDTO'
+              example:
+                - id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                  titulo: Incendio Forestal
+                  descripcion: Fuego activo en cerro norte
+                  severidad: ALTA
+                  fecha: 2026-06-13T14:30:00
+        '401':
+          description: Usuario no autenticado
+
+    post:
+      tags:
+        - Alertas
+      summary: Crea una alerta manual
+      description: |
+        Registra una alerta manual en el sistema.
+        Útil para alertas de situaciones críticas que no están asociadas
+        a reportes automáticos.
+        
+        **Validaciones en AlertRequestHandler:**
+        - titulo: obligatorio, no puede ser blank
+        - descripcion: obligatorio, no puede ser blank
+        - severidad: debe ser ALTA, MEDIA o BAJA
+        
+        Si alguna validación falla, lanza IllegalArgumentException
+        que GlobalExceptionHandler convierte en 400.
+      operationId: createAlert
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAlertRequest'
+            examples:
+              critical:
+                summary: Alerta crítica
+                value:
+                  titulo: Alerta Crítica Manual
+                  descripcion: Situación de emergencia detectada por personal en terreno
+                  severidad: ALTA
+              warning:
+                summary: Alerta preventiva
+                value:
+                  titulo: Advertencia de Condiciones Críticas
+                  descripcion: Condiciones meteorológicas favorables para propagación
+                  severidad: MEDIA
+      responses:
+        '201':
+          description: Alerta creada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertDTO'
+              example:
+                id: xyz789abc
+                titulo: Alerta Crítica Manual
+                descripcion: Situación de emergencia detectada
+                severidad: ALTA
+                fecha: 2026-06-13T14:35:00
+        '400':
+          description: Validación fallida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              examples:
+                missingTitle:
+                  summary: Falta título
+                  value:
+                    error: El campo 'titulo' es obligatorio
+                    status: 400
+                    timestamp: 2026-06-13T14:35:00
+                invalidSeverity:
+                  summary: Severidad inválida
+                  value:
+                    error: El campo 'severidad' debe ser ALTA, MEDIA o BAJA
+                    status: 400
+                    timestamp: 2026-06-13T14:35:00
+        '401':
+          description: Usuario no autenticado
+
+security:
+  - cookieAuth: []
